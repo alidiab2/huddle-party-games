@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<title>Join a Huddle room</title>
+<meta name="description" content="Opens a Huddle game room on your phone, or shows where to get Huddle.">
+<!--
+  Huddle join page (publish as join.html next to privacy.html on the alidiab2/huddle-party-games GitHub Pages site).
+  A room's QR code (Lobby -> Show QR in the app) points here:
+    https://alidiab2.github.io/huddle-party-games/join.html#h=<LAN IPv4>&p=<port>&n=<host name>
+  The room's address rides in the #fragment, so it never reaches the web server. This page opens the app
+  (com.alidiab.huddle://join?h=…&p=…&n=…; Android through an intent: URL), and otherwise shows the store
+  buttons and the address to type. The values are checked exactly like the app does (src/net/joinLink.ts):
+  a private LAN address or a .local name, a port 1024–65535; anything else shows "this link is incomplete".
+  Everything shown is set with textContent (never as HTML).
+-->
+<style>
+  :root {
+    --bg: #f4ebdc;
+    --card: #fffaf2;
+    --text: #2b2420;
+    --muted: #6b5f55;
+    --accent: #c4512b;
+    --accent-text: #ffffff;
+    --line: #e4d6c0;
+    --chip: #efe2cc;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1d1916;
+      --card: #27221e;
+      --text: #f1e8dc;
+      --muted: #b7a998;
+      --accent: #f08a5d;
+      --accent-text: #1d1916;
+      --line: #3a332c;
+      --chip: #332c26;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 17px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans", "Noto Sans Arabic", Tahoma, sans-serif;
+  }
+  main { max-width: 480px; margin: 0 auto; padding: 28px 16px 48px; }
+  .card { background: var(--card); border: 2px solid var(--line); border-radius: 20px; padding: 22px 18px; margin-bottom: 16px; }
+  .logo { font-size: 44px; line-height: 1; text-align: center; margin-bottom: 8px; }
+  h1 { font-size: 1.5rem; line-height: 1.25; margin: 0 0 6px; text-align: center; overflow-wrap: anywhere; }
+  p { margin: 0 0 10px; }
+  .muted { color: var(--muted); font-size: 0.93rem; }
+  .center { text-align: center; }
+  .btn {
+    display: block; width: 100%; text-align: center; text-decoration: none; font-weight: 700; font-size: 1.1rem;
+    padding: 15px 16px; border-radius: 16px; border: 2px solid var(--text); margin: 10px 0 0;
+    background: var(--chip); color: var(--text);
+  }
+  .btn.main { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-size: 1.2rem; }
+  .addr {
+    direction: ltr; unicode-bidi: isolate; text-align: center; font: 700 1.6rem/1.3 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    background: var(--chip); border-radius: 14px; padding: 12px 8px; margin: 8px 0 4px; letter-spacing: 0.02em; overflow-wrap: anywhere;
+    user-select: all; -webkit-user-select: all;
+  }
+  h2 { font-size: 1.05rem; margin: 0 0 6px; }
+  a { color: var(--accent); }
+  .bad { border-color: var(--accent); }
+  [hidden] { display: none !important; }
+  [dir="rtl"] { line-height: 1.8; }
+</style>
+</head>
+<body>
+<main>
+  <div class="card">
+    <div class="logo" aria-hidden="true">🎉</div>
+    <h1 id="title">Join the room</h1>
+    <p class="muted center" id="wifi"></p>
+    <a class="btn main" id="open" href="#">Open Huddle</a>
+  </div>
+
+  <div class="card bad" id="badCard" hidden>
+    <p id="bad"></p>
+  </div>
+
+  <div class="card" id="typeCard">
+    <h2 id="typeTitle"></h2>
+    <div class="addr" id="addr"></div>
+  </div>
+
+  <div class="card">
+    <h2 id="noApp"></h2>
+    <a class="btn" id="ios" href="#" rel="noopener"></a>
+    <a class="btn" id="play" href="#" rel="noopener"></a>
+    <p class="muted" style="margin-top:10px"><a id="apk" href="#" rel="noopener"></a></p>
+  </div>
+</main>
+<script>
+(function () {
+  'use strict';
+  // ---- where to get the app (keep in step with src/settings/links.ts STORE_LINKS)
+  var IOS_URL = 'https://apps.apple.com/app/huddle/id6817427563';
+  var PLAY_URL = 'https://play.google.com/store/apps/details?id=com.alidiab.huddle';
+  var APK_URL = 'https://github.com/alidiab2/huddle-releases/releases/latest';
+  var SCHEME = 'com.alidiab.huddle';
+  var PACKAGE = 'com.alidiab.huddle';
+
+  var T = {
+    en: { title: 'Join {name}’s room', titleNoName: 'Join the room', open: 'Open Huddle', wifi: 'Your phone must be on the same Wi-Fi as the host (or on the host’s hotspot).', typeTitle: 'Or open Huddle, tap “Join a room” and type:', noApp: 'Don’t have Huddle yet?', ios: 'Download on the App Store', play: 'Get it on Google Play', apk: 'Android without Google Play: download the app here', bad: 'This join link is incomplete. Ask the host to show the room’s QR code again.' },
+    ar: { title: 'انضم إلى غرفة {name}', titleNoName: 'انضم إلى الغرفة', open: 'افتح Huddle', wifi: 'يجب أن يكون هاتفك على شبكة الواي فاي نفسها التي عند المضيف (أو على نقطة الاتصال الخاصة به).', typeTitle: 'أو افتح Huddle، واضغط «انضم إلى غرفة» واكتب:', noApp: 'ليس لديك Huddle بعد؟', ios: 'نزّله من App Store', play: 'احصل عليه من Google Play', apk: 'أندرويد بلا Google Play: نزّل التطبيق من هنا', bad: 'رابط الانضمام هذا ناقص. اطلب من المضيف إظهار رمز QR للغرفة مرة أخرى.' },
+    es: { title: 'Únete a la sala de {name}', titleNoName: 'Únete a la sala', open: 'Abrir Huddle', wifi: 'Tu móvil debe estar en la misma Wi-Fi que el anfitrión (o en su punto de acceso).', typeTitle: 'O abre Huddle, toca «Unirse a sala» y escribe:', noApp: '¿Aún no tienes Huddle?', ios: 'Descárgalo en el App Store', play: 'Disponible en Google Play', apk: 'Android sin Google Play: descarga la app aquí', bad: 'Este enlace está incompleto. Pide al anfitrión que vuelva a mostrar el QR de la sala.' },
+    fr: { title: 'Rejoins le salon de {name}', titleNoName: 'Rejoins le salon', open: 'Ouvrir Huddle', wifi: 'Ton téléphone doit être sur le même Wi-Fi que l’hôte (ou sur son partage de connexion).', typeTitle: 'Ou ouvre Huddle, touche « Rejoindre » et tape :', noApp: 'Pas encore Huddle ?', ios: 'Télécharger dans l’App Store', play: 'Disponible sur Google Play', apk: 'Android sans Google Play : télécharge l’appli ici', bad: 'Ce lien est incomplet. Demande à l’hôte de réafficher le QR code du salon.' },
+    de: { title: 'Tritt dem Raum von {name} bei', titleNoName: 'Tritt dem Raum bei', open: 'Huddle öffnen', wifi: 'Dein Handy muss im selben WLAN sein wie der Host (oder in seinem Hotspot).', typeTitle: 'Oder öffne Huddle, tippe auf „Beitreten“ und gib ein:', noApp: 'Noch kein Huddle?', ios: 'Im App Store laden', play: 'Jetzt bei Google Play', apk: 'Android ohne Google Play: App hier herunterladen', bad: 'Dieser Link ist unvollständig. Bitte den Host, den QR-Code des Raums noch mal zu zeigen.' },
+    pt: { title: 'Entre na sala de {name}', titleNoName: 'Entre na sala', open: 'Abrir o Huddle', wifi: 'Seu celular precisa estar no mesmo Wi-Fi do anfitrião (ou no ponto de acesso dele).', typeTitle: 'Ou abra o Huddle, toque em “Entrar” e digite:', noApp: 'Ainda não tem o Huddle?', ios: 'Baixar na App Store', play: 'Disponível no Google Play', apk: 'Android sem Google Play: baixe o app aqui', bad: 'Este link está incompleto. Peça ao anfitrião para mostrar o QR da sala de novo.' },
+    tr: { title: '{name} odasına katıl', titleNoName: 'Odaya katıl', open: 'Huddle’ı aç', wifi: 'Telefonun ev sahibiyle aynı Wi-Fi ağında (ya da onun erişim noktasında) olmalı.', typeTitle: 'Ya da Huddle’ı aç, “Odaya katıl”a dokun ve şunu yaz:', noApp: 'Huddle henüz yok mu?', ios: 'App Store’dan indir', play: 'Google Play’den al', apk: 'Google Play olmayan Android: uygulamayı buradan indir', bad: 'Bu katılma bağlantısı eksik. Ev sahibinden odanın QR kodunu tekrar göstermesini iste.' }
+  };
+  var langs = (navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || 'en']);
+  var lang = 'en';
+  for (var i = 0; i < langs.length; i++) {
+    var l = String(langs[i] || '').slice(0, 2).toLowerCase();
+    if (T[l]) { lang = l; break; }
+  }
+  var t = T[lang];
+  document.documentElement.lang = lang;
+  if (lang === 'ar') document.documentElement.dir = 'rtl';
+
+  // ---- the room, checked like the app checks it (src/net/joinLink.ts)
+  function params(s) {
+    var out = {};
+    if (s.length > 600) return null;
+    var parts = s.split('&');
+    for (var i = 0; i < parts.length; i++) {
+      if (!parts[i]) continue;
+      var k = parts[i].indexOf('=') < 0 ? parts[i] : parts[i].slice(0, parts[i].indexOf('='));
+      var raw = parts[i].indexOf('=') < 0 ? '' : parts[i].slice(parts[i].indexOf('=') + 1);
+      var v;
+      try { v = decodeURIComponent(raw.replace(/\+/g, ' ')); } catch (e) { return null; }
+      if (Object.prototype.hasOwnProperty.call(out, k)) return null;
+      out[k] = v;
+    }
+    return out;
+  }
+  function lanIPv4(s) {
+    var p = s.split('.');
+    if (p.length !== 4) return false;
+    for (var i = 0; i < 4; i++) if (!/^(0|[1-9]\d{0,2})$/.test(p[i]) || Number(p[i]) > 255) return false;
+    var a = Number(p[0]), b = Number(p[1]);
+    return a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127);
+  }
+  function localName(s) {
+    if (s.length > 253 || !/\.local$/i.test(s)) return false;
+    var l = s.split('.');
+    for (var i = 0; i < l.length; i++) if (!/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/.test(l[i])) return false;
+    return l.length >= 2;
+  }
+  function cleanName(s) {
+    var flat = s.replace(/[\u0000-\u001f\u007f-\u009f​-‏‪-‮⁦-⁩﻿]/g, '').replace(/\s+/g, ' ').trim();
+    return Array.from(flat).slice(0, 32).join('');
+  }
+  var q = params((location.hash || location.search || '').slice(1)) || {};
+  var host = q.h || '';
+  var port = /^[1-9]\d{3,4}$/.test(q.p || '') && Number(q.p) >= 1024 && Number(q.p) <= 65535 ? Number(q.p) : 0;
+  var ok = (lanIPv4(host) || localName(host)) && port > 0;
+  var name = ok ? cleanName(q.n || '') : '';
+
+  function $(id) { return document.getElementById(id); }
+  $('title').textContent = name ? t.title.replace('{name}', name) : t.titleNoName;
+  $('wifi').textContent = t.wifi;
+  $('open').textContent = t.open;
+  $('typeTitle').textContent = t.typeTitle;
+  $('noApp').textContent = t.noApp;
+  $('ios').textContent = t.ios;
+  $('ios').href = IOS_URL;
+  $('play').textContent = t.play;
+  $('play').href = PLAY_URL;
+  $('apk').textContent = t.apk;
+  $('apk').href = APK_URL;
+  $('bad').textContent = t.bad;
+
+  if (!ok) {
+    $('badCard').hidden = false;
+    $('typeCard').hidden = true;
+    $('open').hidden = true;
+    return;
+  }
+  host = host.toLowerCase();
+  $('addr').textContent = host + ':' + port;
+
+  var query = 'h=' + encodeURIComponent(host) + '&p=' + port + (name ? '&n=' + encodeURIComponent(name) : '');
+  var appUrl = SCHEME + '://join?' + query;
+  var android = /Android/i.test(navigator.userAgent);
+  var ios = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  // Android: an intent opens the app if it's installed, else comes back here (with o=1: no second try)
+  var here = location.origin + location.pathname + '#' + query + '&o=1';
+  var intentUrl = 'intent://join?' + query + '#Intent;scheme=' + SCHEME + ';package=' + PACKAGE + ';S.browser_fallback_url=' + encodeURIComponent(here) + ';end';
+  var openUrl = android ? intentUrl : appUrl;
+  $('open').href = openUrl;
+  if (ios) $('play').hidden = true;
+  if (ios) $('apk').parentNode.hidden = true;
+  if (android) $('ios').hidden = true;
+
+  // one automatic try right away (the button stays for a second go)
+  if (q.o !== '1' && (android || ios)) {
+    setTimeout(function () { window.location.href = openUrl; }, 250);
+  }
+})();
+</script>
+</body>
+</html>
